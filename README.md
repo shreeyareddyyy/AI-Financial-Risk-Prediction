@@ -17,7 +17,7 @@
 
 ## Project Objective
 
-The objective of this project is to develop an AI-powered financial analytics platform that predicts gold and cryptocurrency price trends, analyzes market sentiment, detects fraudulent financial transactions, and generates a unified financial risk score. The system helps investors and financial institutions make informed decisions through intelligent data analysis. :contentReference[oaicite:1]{index=1}
+The objective of this project is to develop an AI-powered financial analytics platform that predicts gold and cryptocurrency price trends, analyzes market sentiment, detects fraudulent financial transactions, and generates a unified financial risk score. The system helps investors and financial institutions make informed decisions through intelligent data analysis. 
 
 ---
 
@@ -70,7 +70,7 @@ The project uses multiple datasets:
 - European Credit Card Fraud Detection Dataset
 - Financial News Dataset
 - Social Media Sentiment Data
-- Yahoo Finance API for market data :contentReference[oaicite:2]{index=2}
+- Yahoo Finance API for market data 
 
 ---
 
