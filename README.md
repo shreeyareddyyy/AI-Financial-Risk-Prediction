@@ -105,4 +105,4 @@ This project is developed for academic purposes as part of the Major Project for
 
 ## Acknowledgements
 
-We sincerely thank our project guide **Dr. Shalma**, the Department of Artificial Intelligence and Machine Learning, CMR Institute of Technology, and all faculty members for their valuable guidance and support throughout the project. :contentReference[oaicite:3]{index=3}
+We sincerely thank our project guide **Dr. Shalma**, the Department of Artificial Intelligence and Machine Learning, CMR Institute of Technology, and all faculty members for their valuable guidance and support throughout the project. 
