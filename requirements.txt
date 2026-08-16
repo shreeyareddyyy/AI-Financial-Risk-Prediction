@@ -5,3 +5,13 @@ imbalanced-learn
 joblib
 matplotlib
 seaborn
+
+vaderSentiment
+pytesseract
+Pillow
+SpeechRecognition
+pydub
+feedparser
+openpyxl
+telethon
+google-api-python-client
