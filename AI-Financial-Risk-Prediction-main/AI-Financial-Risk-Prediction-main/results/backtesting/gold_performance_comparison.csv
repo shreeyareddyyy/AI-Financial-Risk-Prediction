@@ -1,0 +1,15 @@
+Metric,Strategy,Buy & Hold
+Total Return,-9.9723%,-14.8857%
+CAGR (Annualized Return),-19.3643%,-28.1228%
+Sharpe Ratio,-0.9463,-1.2249
+Max Drawdown,-21.6837%,-25.8415%
+Annualized Volatility,24.7770%,27.8610%
+Win Rate,48.4536%,N/A
+Number of Trades,5,N/A
+Signal Threshold,0.001187,N/A
+Transaction Cost,0.1000%,N/A
+Initial Capital,"$100,000","$100,000"
+Final Portfolio Value,"$90,027.74","$85,114.34"
+Data Points,123,123
+Date Range Start,2026-02-11,2026-02-11
+Date Range End,2026-08-07,2026-08-07

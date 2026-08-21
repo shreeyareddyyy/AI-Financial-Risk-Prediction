@@ -1,0 +1,22 @@
+pandas
+numpy
+scikit-learn
+imbalanced-learn
+joblib
+matplotlib
+seaborn
+
+vaderSentiment
+pytesseract
+Pillow
+SpeechRecognition
+pydub
+feedparser
+openpyxl
+telethon
+google-api-python-client
+
+# Week 3 — SHAP Explainability + Backtesting
+shap
+torch
+yfinance
