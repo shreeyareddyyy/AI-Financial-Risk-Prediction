@@ -6,7 +6,7 @@
 - P Shreeya (1CR23AI077)
 - Raghavi R (1CR23AI092)
 - Sanjanna Rameshh (1CR23AI108)
-- Varshini Papa Reddy (1CR23AI104)
+- Varshini Papa Reddy (1CR23AI133)
 
 
 **Guide:** Dr. Shalma  
