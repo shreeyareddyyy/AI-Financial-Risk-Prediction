@@ -1,31 +1,39 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 
 from flask import Flask, request, jsonify
 import pandas as pd
 
 from fraud_detection import predict_transaction
+
 from database import (
     init_database,
     save_transaction,
     get_transactions,
+    get_transactions_by_time_range,
     save_feedback,
     get_feedback
 )
+
 from explainability import explain_transaction
 
 
+# =========================================================
+# FLASK APPLICATION
+# =========================================================
+
 app = Flask(__name__)
 
-# ---------------------------------------------------------
-# Initialize database
-# ---------------------------------------------------------
+
+# =========================================================
+# INITIALIZE DATABASE
+# =========================================================
 
 init_database()
 
 
-# ---------------------------------------------------------
-# Rapid transaction detection
-# ---------------------------------------------------------
+# =========================================================
+# RAPID TRANSACTION DETECTION
+# =========================================================
 
 def check_rapid_transactions(
     user_id,
@@ -35,13 +43,12 @@ def check_rapid_transactions(
     """
     Detect rapid transaction activity.
 
-    If 3 or more transactions from the same user occur
-    within 60 seconds, rapid activity is detected.
-
-    The current transaction is included in the count.
+    If 3 or more transactions from the same user
+    occur within 60 seconds, rapid activity is detected.
     """
 
     if not user_id:
+
         return False, 1
 
     transactions = get_transactions(
@@ -54,19 +61,16 @@ def check_rapid_transactions(
 
     for transaction in transactions:
 
-        # database.py returns:
-        # id, timestamp, amount, fraud_prediction,
-        # anomaly_score, fraud_risk_score,
-        # fraud_risk_level, alert, message,
-        # user_id, recommended_action
-
         timestamp = transaction[1]
 
         try:
+
             transaction_time = datetime.fromisoformat(
                 timestamp
             )
+
         except (ValueError, TypeError):
+
             continue
 
         time_difference = (
@@ -74,9 +78,9 @@ def check_rapid_transactions(
         ).total_seconds()
 
         if 0 <= time_difference <= window_seconds:
+
             previous_count += 1
 
-    # Include the current transaction
     total_recent_count = previous_count + 1
 
     rapid_activity = (
@@ -86,22 +90,33 @@ def check_rapid_transactions(
     return rapid_activity, total_recent_count
 
 
-# ---------------------------------------------------------
-# Home
-# ---------------------------------------------------------
+# =========================================================
+# HOME
+# =========================================================
 
 @app.route("/", methods=["GET"])
 def home():
 
     return jsonify({
         "status": "success",
-        "message": "Raghavi Fraud Detection API is running"
+        "message": "Raghavi Fraud Detection API is running",
+        "features": [
+            "Real-time fraud detection",
+            "Explainable fraud alerts",
+            "Rapid transaction detection",
+            "Transaction history",
+            "Fraud feedback",
+            "Daily fraud analysis",
+            "Hourly fraud analysis",
+            "Minute-level fraud analysis",
+            "Second-level activity monitoring"
+        ]
     })
 
 
-# ---------------------------------------------------------
-# Fraud Detection
-# ---------------------------------------------------------
+# =========================================================
+# FRAUD DETECTION
+# =========================================================
 
 @app.route(
     "/api/fraud/check",
@@ -121,7 +136,7 @@ def check_fraud():
             }), 400
 
         # -------------------------------------------------
-        # Read user ID
+        # READ USER ID
         # -------------------------------------------------
 
         if isinstance(data, dict):
@@ -174,7 +189,7 @@ def check_fraud():
             }), 400
 
         # -------------------------------------------------
-        # Convert transaction to DataFrame
+        # CREATE DATAFRAME
         # -------------------------------------------------
 
         transaction = pd.DataFrame(
@@ -182,7 +197,7 @@ def check_fraud():
         )
 
         # -------------------------------------------------
-        # Required model features
+        # REQUIRED MODEL FEATURES
         # -------------------------------------------------
 
         expected_features = [
@@ -196,7 +211,7 @@ def check_fraud():
         ]
 
         # -------------------------------------------------
-        # Check missing features
+        # CHECK MISSING FEATURES
         # -------------------------------------------------
 
         missing_features = [
@@ -216,7 +231,7 @@ def check_fraud():
             }), 400
 
         # -------------------------------------------------
-        # Check unexpected features
+        # CHECK UNEXPECTED FEATURES
         # -------------------------------------------------
 
         extra_features = [
@@ -236,7 +251,7 @@ def check_fraud():
             }), 400
 
         # -------------------------------------------------
-        # Put features in exact model order
+        # EXACT MODEL ORDER
         # -------------------------------------------------
 
         transaction = transaction[
@@ -244,7 +259,7 @@ def check_fraud():
         ]
 
         # -------------------------------------------------
-        # ML fraud detection
+        # ML FRAUD DETECTION
         # -------------------------------------------------
 
         result = predict_transaction(
@@ -270,7 +285,7 @@ def check_fraud():
         )
 
         # -------------------------------------------------
-        # Transaction information
+        # TRANSACTION INFORMATION
         # -------------------------------------------------
 
         amount = float(
@@ -281,8 +296,32 @@ def check_fraud():
             timespec="seconds"
         )
 
+        current_datetime = datetime.fromisoformat(
+            timestamp
+        )
+
         # -------------------------------------------------
-        # Explainability
+        # TIME COMPONENTS
+        # -------------------------------------------------
+
+        transaction_date = (
+            current_datetime.strftime("%Y-%m-%d")
+        )
+
+        transaction_hour = (
+            current_datetime.hour
+        )
+
+        transaction_minute = (
+            current_datetime.minute
+        )
+
+        transaction_second = (
+            current_datetime.second
+        )
+
+        # -------------------------------------------------
+        # EXPLAINABILITY
         # -------------------------------------------------
 
         explanation = explain_transaction(
@@ -292,7 +331,7 @@ def check_fraud():
         )
 
         # -------------------------------------------------
-        # Rapid transaction detection
+        # RAPID TRANSACTION DETECTION
         # -------------------------------------------------
 
         rapid_activity, recent_transaction_count = (
@@ -312,7 +351,7 @@ def check_fraud():
             )
 
         # -------------------------------------------------
-        # Alert decision
+        # ALERT DECISION
         # -------------------------------------------------
 
         if rapid_activity:
@@ -394,10 +433,10 @@ def check_fraud():
             )
 
         # -------------------------------------------------
-        # Save transaction
+        # SAVE TRANSACTION
         # -------------------------------------------------
 
-        save_transaction(
+        transaction_id = save_transaction(
             amount=amount,
             fraud_prediction=fraud_prediction,
             anomaly_score=anomaly_score,
@@ -406,22 +445,35 @@ def check_fraud():
             alert=alert,
             message=message,
             user_id=user_id,
-            recommended_action=recommended_action
+            recommended_action=recommended_action,
+            timestamp=timestamp
         )
 
         # -------------------------------------------------
-        # API response
+        # API RESPONSE
         # -------------------------------------------------
 
         return jsonify({
 
             "status": "success",
 
+            "transaction_id": transaction_id,
+
             "user_id": user_id,
 
             "transaction": {
+
                 "amount": amount,
-                "time": timestamp
+
+                "time": timestamp,
+
+                "date": transaction_date,
+
+                "hour": transaction_hour,
+
+                "minute": transaction_minute,
+
+                "second": transaction_second
             },
 
             "fraud_prediction": fraud_prediction,
@@ -488,9 +540,9 @@ def check_fraud():
         }), 500
 
 
-# ---------------------------------------------------------
-# Transaction History
-# ---------------------------------------------------------
+# =========================================================
+# TRANSACTION HISTORY
+# =========================================================
 
 @app.route(
     "/api/fraud/history",
@@ -560,9 +612,450 @@ def fraud_history():
         }), 500
 
 
-# ---------------------------------------------------------
-# Save Fraud Feedback
-# ---------------------------------------------------------
+# =========================================================
+# TIME ANALYSIS HELPER
+# =========================================================
+
+def create_time_summary(
+    rows,
+    period
+):
+    """
+    Create fraud statistics for a selected time period.
+    """
+
+    total_transactions = len(rows)
+
+    fraud_alerts = sum(
+        1 for row in rows
+        if int(row[7]) == 1
+    )
+
+    ml_fraud_predictions = sum(
+        1 for row in rows
+        if int(row[3]) == 1
+    )
+
+    normal_transactions = (
+        total_transactions - fraud_alerts
+    )
+
+    if total_transactions > 0:
+
+        fraud_rate = (
+            fraud_alerts
+            / total_transactions
+        ) * 100
+
+    else:
+
+        fraud_rate = 0.0
+
+    return {
+
+        "period": period,
+
+        "total_transactions": (
+            total_transactions
+        ),
+
+        "fraud_alerts": fraud_alerts,
+
+        "ml_fraud_predictions": (
+            ml_fraud_predictions
+        ),
+
+        "normal_transactions": (
+            normal_transactions
+        ),
+
+        "fraud_rate_percent": round(
+            fraud_rate,
+            2
+        )
+    }
+
+
+# =========================================================
+# TIME ANALYSIS
+# =========================================================
+
+@app.route(
+    "/api/fraud/time-analysis",
+    methods=["GET"]
+)
+def fraud_time_analysis():
+
+    try:
+
+        date_string = request.args.get(
+            "date"
+        )
+
+        hour_string = request.args.get(
+            "hour"
+        )
+
+        minute_string = request.args.get(
+            "minute"
+        )
+
+        second_string = request.args.get(
+            "second"
+        )
+
+        user_id = request.args.get(
+            "user_id"
+        )
+
+        # -------------------------------------------------
+        # DATE REQUIRED
+        # -------------------------------------------------
+
+        if not date_string:
+
+            return jsonify({
+
+                "status": "error",
+
+                "error": (
+                    "date is required. "
+                    "Use YYYY-MM-DD."
+                )
+
+            }), 400
+
+        # -------------------------------------------------
+        # VALIDATE DATE
+        # -------------------------------------------------
+
+        try:
+
+            selected_date = datetime.strptime(
+                date_string,
+                "%Y-%m-%d"
+            )
+
+        except ValueError:
+
+            return jsonify({
+
+                "status": "error",
+
+                "error": (
+                    "Invalid date format. "
+                    "Use YYYY-MM-DD."
+                )
+
+            }), 400
+
+        # -------------------------------------------------
+        # DAILY ANALYSIS
+        # -------------------------------------------------
+
+        day_start = selected_date
+
+        day_end = (
+            day_start
+            + timedelta(days=1)
+        )
+
+        daily_rows = get_transactions_by_time_range(
+            day_start.isoformat(
+                timespec="seconds"
+            ),
+            day_end.isoformat(
+                timespec="seconds"
+            ),
+            user_id
+        )
+
+        daily_summary = create_time_summary(
+            daily_rows,
+            "daily"
+        )
+
+        # -------------------------------------------------
+        # HOURLY ANALYSIS
+        # -------------------------------------------------
+
+        hourly_analysis = []
+
+        for hour in range(24):
+
+            hour_start = (
+                selected_date
+                + timedelta(hours=hour)
+            )
+
+            hour_end = (
+                hour_start
+                + timedelta(hours=1)
+            )
+
+            rows = get_transactions_by_time_range(
+                hour_start.isoformat(
+                    timespec="seconds"
+                ),
+                hour_end.isoformat(
+                    timespec="seconds"
+                ),
+                user_id
+            )
+
+            summary = create_time_summary(
+                rows,
+                f"{hour:02d}:00"
+            )
+
+            hourly_analysis.append(
+                summary
+            )
+
+        # -------------------------------------------------
+        # OPTIONAL SPECIFIC HOUR
+        # -------------------------------------------------
+
+        selected_hour_analysis = None
+
+        if hour_string is not None:
+
+            try:
+
+                hour = int(hour_string)
+
+                if hour < 0 or hour > 23:
+
+                    raise ValueError
+
+            except ValueError:
+
+                return jsonify({
+
+                    "status": "error",
+
+                    "error": (
+                        "hour must be between 0 and 23."
+                    )
+
+                }), 400
+
+            hour_start = (
+                selected_date
+                + timedelta(hours=hour)
+            )
+
+            hour_end = (
+                hour_start
+                + timedelta(hours=1)
+            )
+
+            rows = get_transactions_by_time_range(
+                hour_start.isoformat(
+                    timespec="seconds"
+                ),
+                hour_end.isoformat(
+                    timespec="seconds"
+                ),
+                user_id
+            )
+
+            selected_hour_analysis = (
+                create_time_summary(
+                    rows,
+                    f"{hour:02d}:00"
+                )
+            )
+
+        # -------------------------------------------------
+        # OPTIONAL SPECIFIC MINUTE
+        # -------------------------------------------------
+
+        selected_minute_analysis = None
+
+        if (
+            hour_string is not None
+            and minute_string is not None
+        ):
+
+            try:
+
+                hour = int(hour_string)
+                minute = int(minute_string)
+
+                if (
+                    hour < 0
+                    or hour > 23
+                    or minute < 0
+                    or minute > 59
+                ):
+
+                    raise ValueError
+
+            except ValueError:
+
+                return jsonify({
+
+                    "status": "error",
+
+                    "error": (
+                        "hour must be 0-23 "
+                        "and minute must be 0-59."
+                    )
+
+                }), 400
+
+            minute_start = (
+                selected_date
+                + timedelta(
+                    hours=hour,
+                    minutes=minute
+                )
+            )
+
+            minute_end = (
+                minute_start
+                + timedelta(minutes=1)
+            )
+
+            rows = get_transactions_by_time_range(
+                minute_start.isoformat(
+                    timespec="seconds"
+                ),
+                minute_end.isoformat(
+                    timespec="seconds"
+                ),
+                user_id
+            )
+
+            selected_minute_analysis = (
+                create_time_summary(
+                    rows,
+                    minute_start.strftime(
+                        "%H:%M"
+                    )
+                )
+            )
+
+        # -------------------------------------------------
+        # OPTIONAL SPECIFIC SECOND
+        # -------------------------------------------------
+
+        selected_second_analysis = None
+
+        if (
+            hour_string is not None
+            and minute_string is not None
+            and second_string is not None
+        ):
+
+            try:
+
+                hour = int(hour_string)
+                minute = int(minute_string)
+                second = int(second_string)
+
+                if (
+                    hour < 0
+                    or hour > 23
+                    or minute < 0
+                    or minute > 59
+                    or second < 0
+                    or second > 59
+                ):
+
+                    raise ValueError
+
+            except ValueError:
+
+                return jsonify({
+
+                    "status": "error",
+
+                    "error": (
+                        "Invalid hour, minute, "
+                        "or second."
+                    )
+
+                }), 400
+
+            second_start = (
+                selected_date
+                + timedelta(
+                    hours=hour,
+                    minutes=minute,
+                    seconds=second
+                )
+            )
+
+            second_end = (
+                second_start
+                + timedelta(seconds=1)
+            )
+
+            rows = get_transactions_by_time_range(
+                second_start.isoformat(
+                    timespec="seconds"
+                ),
+                second_end.isoformat(
+                    timespec="seconds"
+                ),
+                user_id
+            )
+
+            selected_second_analysis = (
+                create_time_summary(
+                    rows,
+                    second_start.strftime(
+                        "%H:%M:%S"
+                    )
+                )
+            )
+
+        # -------------------------------------------------
+        # RESPONSE
+        # -------------------------------------------------
+
+        return jsonify({
+
+            "status": "success",
+
+            "date": date_string,
+
+            "user_id": user_id,
+
+            "daily_analysis": daily_summary,
+
+            "hourly_analysis": hourly_analysis,
+
+            "selected_hour": (
+                selected_hour_analysis
+            ),
+
+            "selected_minute": (
+                selected_minute_analysis
+            ),
+
+            "selected_second": (
+                selected_second_analysis
+            )
+
+        }), 200
+
+    except Exception as e:
+
+        return jsonify({
+
+            "status": "error",
+
+            "error": str(e)
+
+        }), 500
+
+
+# =========================================================
+# FRAUD FEEDBACK - SAVE
+# =========================================================
 
 @app.route(
     "/api/fraud/feedback",
@@ -577,8 +1070,13 @@ def fraud_feedback():
         if not data:
 
             return jsonify({
+
                 "status": "error",
-                "error": "No feedback data provided"
+
+                "error": (
+                    "No feedback data provided"
+                )
+
             }), 400
 
         transaction_id = data.get(
@@ -592,8 +1090,13 @@ def fraud_feedback():
         if transaction_id is None:
 
             return jsonify({
+
                 "status": "error",
-                "error": "transaction_id is required"
+
+                "error": (
+                    "transaction_id is required"
+                )
+
             }), 400
 
         if feedback not in [
@@ -602,12 +1105,15 @@ def fraud_feedback():
         ]:
 
             return jsonify({
+
                 "status": "error",
+
                 "error": (
                     "Feedback must be "
                     "'confirmed_fraud' or "
                     "'false_positive'"
                 )
+
             }), 400
 
         save_feedback(
@@ -636,21 +1142,27 @@ def fraud_feedback():
     except ValueError as e:
 
         return jsonify({
+
             "status": "error",
+
             "error": str(e)
+
         }), 400
 
     except Exception as e:
 
         return jsonify({
+
             "status": "error",
+
             "error": str(e)
+
         }), 500
 
 
-# ---------------------------------------------------------
-# Get Fraud Feedback
-# ---------------------------------------------------------
+# =========================================================
+# FRAUD FEEDBACK - HISTORY
+# =========================================================
 
 @app.route(
     "/api/fraud/feedback",
@@ -691,14 +1203,17 @@ def fraud_feedback_history():
     except Exception as e:
 
         return jsonify({
+
             "status": "error",
+
             "error": str(e)
+
         }), 500
 
 
-# ---------------------------------------------------------
-# Start Flask server
-# ---------------------------------------------------------
+# =========================================================
+# START FLASK SERVER
+# =========================================================
 
 if __name__ == "__main__":
 
