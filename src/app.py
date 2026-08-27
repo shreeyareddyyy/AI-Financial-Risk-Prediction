@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from flask import Flask, request, jsonify
 import pandas as pd
 
@@ -8,11 +10,11 @@ from explainability import explain_transaction
 
 app = Flask(__name__)
 
-# Create SQLite database
+# Initialize SQLite database
 init_database()
 
 
-@app.route("/")
+@app.route("/", methods=["GET"])
 def home():
     return jsonify({
         "status": "success",
@@ -28,12 +30,106 @@ def check_fraud():
 
         if not data:
             return jsonify({
+                "status": "error",
                 "error": "No transaction data provided"
             }), 400
 
-        transaction = pd.DataFrame(data)
+        # ---------------------------------------------------------
+        # Accept either:
+        # {
+        #     "user_id": "user123",
+        #     "Time": ...,
+        #     "V1": ...,
+        #     ...
+        # }
+        #
+        # or a list containing one transaction.
+        # ---------------------------------------------------------
 
-        # Run fraud detection
+        if isinstance(data, dict):
+            user_id = data.get("user_id", "demo_user")
+
+            transaction_data = {
+                key: value
+                for key, value in data.items()
+                if key != "user_id"
+            }
+
+        elif isinstance(data, list):
+
+            if len(data) != 1 or not isinstance(data[0], dict):
+                return jsonify({
+                    "status": "error",
+                    "error": "Exactly one transaction must be provided"
+                }), 400
+
+            user_id = data[0].get("user_id", "demo_user")
+
+            transaction_data = {
+                key: value
+                for key, value in data[0].items()
+                if key != "user_id"
+            }
+
+        else:
+            return jsonify({
+                "status": "error",
+                "error": "Request must contain a transaction object"
+            }), 400
+
+        # ---------------------------------------------------------
+        # Convert transaction into DataFrame
+        # ---------------------------------------------------------
+
+        transaction = pd.DataFrame([transaction_data])
+
+        # ---------------------------------------------------------
+        # Required model features
+        # ---------------------------------------------------------
+
+        expected_features = [
+            "Time",
+            "V1", "V2", "V3", "V4", "V5", "V6", "V7",
+            "V8", "V9", "V10", "V11", "V12", "V13",
+            "V14", "V15", "V16", "V17", "V18", "V19",
+            "V20", "V21", "V22", "V23", "V24", "V25",
+            "V26", "V27", "V28",
+            "Amount"
+        ]
+
+        missing_features = [
+            feature
+            for feature in expected_features
+            if feature not in transaction.columns
+        ]
+
+        extra_features = [
+            feature
+            for feature in transaction.columns
+            if feature not in expected_features
+        ]
+
+        if missing_features:
+            return jsonify({
+                "status": "error",
+                "error": "Missing required transaction features",
+                "missing_features": missing_features
+            }), 400
+
+        if extra_features:
+            return jsonify({
+                "status": "error",
+                "error": "Unexpected transaction features",
+                "extra_features": extra_features
+            }), 400
+
+        # Ensure exact model feature order
+        transaction = transaction[expected_features]
+
+        # ---------------------------------------------------------
+        # Real-time fraud detection
+        # ---------------------------------------------------------
+
         result = predict_transaction(transaction)
 
         row = result.iloc[0]
@@ -43,55 +139,143 @@ def check_fraud():
         fraud_risk_score = float(row["Fraud_Risk_Score"])
         fraud_risk_level = str(row["Fraud_Risk_Level"])
 
-        # Get transaction amount
-        amount = None
+        # ---------------------------------------------------------
+        # Transaction details
+        # ---------------------------------------------------------
 
-        if "Amount" in transaction.columns:
-            amount = float(transaction.iloc[0]["Amount"])
+        amount = float(transaction.iloc[0]["Amount"])
 
-        # Generate explanation
+        # Human-readable timestamp for the API alert
+        timestamp = datetime.now().isoformat(timespec="seconds")
+
+        # ---------------------------------------------------------
+        # Explainability
+        # ---------------------------------------------------------
+
         explanation = explain_transaction(
             transaction,
             anomaly_score,
             fraud_prediction
         )
 
-        # Alert and message
+        # ---------------------------------------------------------
+        # Instant alert
+        # ---------------------------------------------------------
+
         if fraud_prediction == 1 or fraud_risk_level == "High":
 
             alert = True
-            message = "Transaction flagged as potentially fraudulent."
+
+            reason = (
+                "The transaction has been classified as potentially "
+                "fraudulent or has a high fraud risk."
+            )
+
+            recommended_action = (
+                "Review the transaction immediately and verify the "
+                "transaction with the account holder before approving it."
+            )
+
+            message = (
+                "Transaction flagged as potentially fraudulent."
+            )
+
+        elif fraud_risk_level == "Medium":
+
+            alert = False
+
+            reason = (
+                "The transaction has a medium fraud risk and should "
+                "be monitored."
+            )
+
+            recommended_action = (
+                "Monitor the transaction and verify it if other "
+                "suspicious activity is observed."
+            )
+
+            message = (
+                "Transaction has medium fraud risk."
+            )
 
         else:
 
             alert = False
-            message = "Transaction appears normal."
 
-        # Save transaction
+            reason = (
+                "The transaction has a low fraud risk and the model "
+                "did not classify it as an anomaly."
+            )
+
+            recommended_action = (
+                "No immediate action required."
+            )
+
+            message = (
+                "Transaction appears normal."
+            )
+
+        # ---------------------------------------------------------
+        # Save transaction in SQLite
+        # ---------------------------------------------------------
+
         save_transaction(
+            user_id=user_id,
             amount=amount,
             fraud_prediction=fraud_prediction,
             anomaly_score=anomaly_score,
             fraud_risk_score=fraud_risk_score,
             fraud_risk_level=fraud_risk_level,
             alert=alert,
-            message=message
+            message=message,
+            recommended_action=recommended_action
         )
 
-        # Return API response
+        # ---------------------------------------------------------
+        # Return complete real-time response
+        # ---------------------------------------------------------
+
         return jsonify({
+            "status": "success",
+            "user_id": user_id,
+
+            "transaction": {
+                "amount": amount,
+                "time": timestamp
+            },
+
             "fraud_prediction": fraud_prediction,
             "anomaly_score": anomaly_score,
             "fraud_risk_score": fraud_risk_score,
             "fraud_risk_level": fraud_risk_level,
+
             "alert": alert,
+
+            "alert_details": {
+                "amount": amount,
+                "time": timestamp,
+                "risk_score": fraud_risk_score,
+                "risk_level": fraud_risk_level,
+                "reason": reason,
+                "anomaly_score": anomaly_score,
+                "recommended_action": recommended_action
+            },
+
             "message": message,
             "explanation": explanation
-        })
+        }), 200
+
+    except ValueError as e:
+
+        return jsonify({
+            "status": "error",
+            "error": str(e)
+        }), 400
 
     except Exception as e:
 
         return jsonify({
+            "status": "error",
             "error": str(e)
         }), 500
 
@@ -100,7 +284,13 @@ def check_fraud():
 def fraud_history():
 
     try:
-        transactions = get_transactions()
+
+        # Optional user filtering:
+        # /api/fraud/history?user_id=user123
+
+        user_id = request.args.get("user_id")
+
+        transactions = get_transactions(user_id=user_id)
 
         results = []
 
@@ -108,25 +298,29 @@ def fraud_history():
 
             results.append({
                 "id": transaction[0],
-                "timestamp": transaction[1],
-                "amount": transaction[2],
-                "fraud_prediction": transaction[3],
-                "anomaly_score": transaction[4],
-                "fraud_risk_score": transaction[5],
-                "fraud_risk_level": transaction[6],
-                "alert": bool(transaction[7]),
-                "message": transaction[8]
+                "user_id": transaction[1],
+                "timestamp": transaction[2],
+                "amount": transaction[3],
+                "fraud_prediction": transaction[4],
+                "anomaly_score": transaction[5],
+                "fraud_risk_score": transaction[6],
+                "fraud_risk_level": transaction[7],
+                "alert": bool(transaction[8]),
+                "message": transaction[9],
+                "recommended_action": transaction[10]
             })
 
         return jsonify({
             "status": "success",
+            "user_id": user_id,
             "count": len(results),
             "transactions": results
-        })
+        }), 200
 
     except Exception as e:
 
         return jsonify({
+            "status": "error",
             "error": str(e)
         }), 500
 

@@ -3,15 +3,17 @@ import pandas as pd
 
 def explain_transaction(transaction, anomaly_score, fraud_prediction):
     """
-    Creates a simple explanation using the actual transaction
-    values and the model's anomaly result.
+    Generate an interpretable explanation for an Isolation Forest result.
+
+    This does not fabricate SHAP percentages.
+    It uses observable transaction values and the actual model result.
     """
 
     transaction_df = pd.DataFrame(transaction)
 
     explanations = []
 
-    # Check transaction amount
+    # Amount-based explanation
     if "Amount" in transaction_df.columns:
         amount = float(transaction_df.iloc[0]["Amount"])
 
@@ -19,18 +21,23 @@ def explain_transaction(transaction, anomaly_score, fraud_prediction):
             explanations.append(
                 f"High transaction amount detected: {amount:.2f}"
             )
+        else:
+            explanations.append(
+                f"Transaction amount is {amount:.2f}."
+            )
 
-    # Explain anomaly score
+    # Actual Isolation Forest anomaly score
     if anomaly_score < 0:
         explanations.append(
-            "The transaction has an unusual pattern compared with normal transactions."
+            "The transaction has an unusual pattern compared with "
+            "the patterns learned from normal transactions."
         )
     else:
         explanations.append(
             "The transaction pattern is similar to normal transactions."
         )
 
-    # Final model explanation
+    # Actual model classification
     if fraud_prediction == 1:
         explanations.append(
             "Isolation Forest classified this transaction as an anomaly."
