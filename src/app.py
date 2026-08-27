@@ -16,13 +16,79 @@ from explainability import explain_transaction
 
 app = Flask(__name__)
 
-# Initialize SQLite database
+# ---------------------------------------------------------
+# Initialize database
+# ---------------------------------------------------------
+
 init_database()
 
 
-# ============================================================
-# HOME
-# ============================================================
+# ---------------------------------------------------------
+# Rapid transaction detection
+# ---------------------------------------------------------
+
+def check_rapid_transactions(
+    user_id,
+    window_seconds=60,
+    threshold=3
+):
+    """
+    Detect rapid transaction activity.
+
+    If 3 or more transactions from the same user occur
+    within 60 seconds, rapid activity is detected.
+
+    The current transaction is included in the count.
+    """
+
+    if not user_id:
+        return False, 1
+
+    transactions = get_transactions(
+        user_id=user_id
+    )
+
+    now = datetime.now()
+
+    previous_count = 0
+
+    for transaction in transactions:
+
+        # database.py returns:
+        # id, timestamp, amount, fraud_prediction,
+        # anomaly_score, fraud_risk_score,
+        # fraud_risk_level, alert, message,
+        # user_id, recommended_action
+
+        timestamp = transaction[1]
+
+        try:
+            transaction_time = datetime.fromisoformat(
+                timestamp
+            )
+        except (ValueError, TypeError):
+            continue
+
+        time_difference = (
+            now - transaction_time
+        ).total_seconds()
+
+        if 0 <= time_difference <= window_seconds:
+            previous_count += 1
+
+    # Include the current transaction
+    total_recent_count = previous_count + 1
+
+    rapid_activity = (
+        total_recent_count >= threshold
+    )
+
+    return rapid_activity, total_recent_count
+
+
+# ---------------------------------------------------------
+# Home
+# ---------------------------------------------------------
 
 @app.route("/", methods=["GET"])
 def home():
@@ -30,14 +96,17 @@ def home():
     return jsonify({
         "status": "success",
         "message": "Raghavi Fraud Detection API is running"
-    }), 200
+    })
 
 
-# ============================================================
-# REAL-TIME FRAUD DETECTION
-# ============================================================
+# ---------------------------------------------------------
+# Fraud Detection
+# ---------------------------------------------------------
 
-@app.route("/api/fraud/check", methods=["POST"])
+@app.route(
+    "/api/fraud/check",
+    methods=["POST"]
+)
 def check_fraud():
 
     try:
@@ -51,10 +120,9 @@ def check_fraud():
                 "error": "No transaction data provided"
             }), 400
 
-
-        # ------------------------------------------------------
-        # Accept either a transaction object or a single-item list
-        # ------------------------------------------------------
+        # -------------------------------------------------
+        # Read user ID
+        # -------------------------------------------------
 
         if isinstance(data, dict):
 
@@ -78,7 +146,10 @@ def check_fraud():
 
                 return jsonify({
                     "status": "error",
-                    "error": "Exactly one transaction must be provided"
+                    "error": (
+                        "Exactly one transaction "
+                        "must be provided"
+                    )
                 }), 400
 
             user_id = data[0].get(
@@ -96,22 +167,23 @@ def check_fraud():
 
             return jsonify({
                 "status": "error",
-                "error": "Request must contain a transaction object"
+                "error": (
+                    "Request must contain "
+                    "a transaction object"
+                )
             }), 400
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Convert transaction to DataFrame
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         transaction = pd.DataFrame(
             [transaction_data]
         )
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Required model features
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         expected_features = [
             "Time",
@@ -123,10 +195,9 @@ def check_fraud():
             "Amount"
         ]
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Check missing features
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         missing_features = [
             feature
@@ -138,14 +209,15 @@ def check_fraud():
 
             return jsonify({
                 "status": "error",
-                "error": "Missing required transaction features",
+                "error": (
+                    "Missing required transaction features"
+                ),
                 "missing_features": missing_features
             }), 400
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Check unexpected features
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         extra_features = [
             feature
@@ -157,30 +229,29 @@ def check_fraud():
 
             return jsonify({
                 "status": "error",
-                "error": "Unexpected transaction features",
+                "error": (
+                    "Unexpected transaction features"
+                ),
                 "extra_features": extra_features
             }), 400
 
-
-        # ------------------------------------------------------
-        # Ensure exact model feature order
-        # ------------------------------------------------------
+        # -------------------------------------------------
+        # Put features in exact model order
+        # -------------------------------------------------
 
         transaction = transaction[
             expected_features
         ]
 
-
-        # ------------------------------------------------------
-        # Real-time fraud detection
-        # ------------------------------------------------------
+        # -------------------------------------------------
+        # ML fraud detection
+        # -------------------------------------------------
 
         result = predict_transaction(
             transaction
         )
 
         row = result.iloc[0]
-
 
         fraud_prediction = int(
             row["Fraud_Prediction"]
@@ -198,10 +269,9 @@ def check_fraud():
             row["Fraud_Risk_Level"]
         )
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Transaction information
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         amount = float(
             transaction.iloc[0]["Amount"]
@@ -211,10 +281,9 @@ def check_fraud():
             timespec="seconds"
         )
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Explainability
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         explanation = explain_transaction(
             transaction,
@@ -222,12 +291,51 @@ def check_fraud():
             fraud_prediction
         )
 
+        # -------------------------------------------------
+        # Rapid transaction detection
+        # -------------------------------------------------
 
-        # ------------------------------------------------------
-        # Instant alert
-        # ------------------------------------------------------
+        rapid_activity, recent_transaction_count = (
+            check_rapid_transactions(
+                user_id=user_id,
+                window_seconds=60,
+                threshold=3
+            )
+        )
 
-        if (
+        if rapid_activity:
+
+            explanation.append(
+                "Rapid transaction activity detected: "
+                f"{recent_transaction_count} transactions "
+                "within 60 seconds."
+            )
+
+        # -------------------------------------------------
+        # Alert decision
+        # -------------------------------------------------
+
+        if rapid_activity:
+
+            alert = True
+
+            reason = (
+                "Rapid transaction activity detected. "
+                f"{recent_transaction_count} transactions "
+                "occurred within 60 seconds."
+            )
+
+            recommended_action = (
+                "Review the recent transactions immediately "
+                "and verify the activity with the account holder."
+            )
+
+            message = (
+                "Transaction flagged due to rapid "
+                "transaction activity."
+            )
+
+        elif (
             fraud_prediction == 1
             or fraud_risk_level == "High"
         ):
@@ -236,19 +344,19 @@ def check_fraud():
 
             reason = (
                 "The transaction has been classified as "
-                "potentially fraudulent or has a high fraud risk."
+                "potentially fraudulent or has a high "
+                "fraud risk."
             )
 
             recommended_action = (
-                "Review the transaction immediately and verify "
-                "the transaction with the account holder before "
-                "approving it."
+                "Review the transaction immediately and "
+                "verify the transaction with the account "
+                "holder before approving it."
             )
 
             message = (
                 "Transaction flagged as potentially fraudulent."
             )
-
 
         elif fraud_risk_level == "Medium":
 
@@ -260,14 +368,13 @@ def check_fraud():
             )
 
             recommended_action = (
-                "Monitor the transaction and verify it if "
-                "other suspicious activity is observed."
+                "Monitor the transaction and verify it "
+                "if other suspicious activity is observed."
             )
 
             message = (
                 "Transaction has medium fraud risk."
             )
-
 
         else:
 
@@ -286,13 +393,11 @@ def check_fraud():
                 "Transaction appears normal."
             )
 
-
-        # ------------------------------------------------------
+        # -------------------------------------------------
         # Save transaction
-        # ------------------------------------------------------
+        # -------------------------------------------------
 
         save_transaction(
-            user_id=user_id,
             amount=amount,
             fraud_prediction=fraud_prediction,
             anomaly_score=anomaly_score,
@@ -300,36 +405,19 @@ def check_fraud():
             fraud_risk_level=fraud_risk_level,
             alert=alert,
             message=message,
+            user_id=user_id,
             recommended_action=recommended_action
         )
 
-
-        # ------------------------------------------------------
-        # Get ID of the transaction just saved
-        # ------------------------------------------------------
-
-        transactions = get_transactions(
-            user_id=user_id
-        )
-
-        transaction_id = None
-
-        if transactions:
-
-            transaction_id = transactions[0][0]
-
-
-        # ------------------------------------------------------
-        # Return complete response
-        # ------------------------------------------------------
+        # -------------------------------------------------
+        # API response
+        # -------------------------------------------------
 
         return jsonify({
 
             "status": "success",
 
             "user_id": user_id,
-
-            "transaction_id": transaction_id,
 
             "transaction": {
                 "amount": amount,
@@ -346,6 +434,12 @@ def check_fraud():
 
             "alert": alert,
 
+            "rapid_transaction_alert": rapid_activity,
+
+            "recent_transaction_count": (
+                recent_transaction_count
+            ),
+
             "alert_details": {
 
                 "amount": amount,
@@ -360,8 +454,17 @@ def check_fraud():
 
                 "anomaly_score": anomaly_score,
 
-                "recommended_action":
+                "recommended_action": (
                     recommended_action
+                ),
+
+                "rapid_transaction_alert": (
+                    rapid_activity
+                ),
+
+                "recent_transaction_count": (
+                    recent_transaction_count
+                )
             },
 
             "message": message,
@@ -370,14 +473,12 @@ def check_fraud():
 
         }), 200
 
-
     except ValueError as e:
 
         return jsonify({
             "status": "error",
             "error": str(e)
         }), 400
-
 
     except Exception as e:
 
@@ -387,9 +488,9 @@ def check_fraud():
         }), 500
 
 
-# ============================================================
-# TRANSACTION HISTORY
-# ============================================================
+# ---------------------------------------------------------
+# Transaction History
+# ---------------------------------------------------------
 
 @app.route(
     "/api/fraud/history",
@@ -398,9 +499,6 @@ def check_fraud():
 def fraud_history():
 
     try:
-
-        # Optional:
-        # /api/fraud/history?user_id=raghavi_demo
 
         user_id = request.args.get(
             "user_id"
@@ -412,37 +510,35 @@ def fraud_history():
 
         results = []
 
-
         for transaction in transactions:
 
             results.append({
 
                 "id": transaction[0],
 
-                "user_id": transaction[1],
+                "timestamp": transaction[1],
 
-                "timestamp": transaction[2],
+                "amount": transaction[2],
 
-                "amount": transaction[3],
+                "fraud_prediction": transaction[3],
 
-                "fraud_prediction": transaction[4],
+                "anomaly_score": transaction[4],
 
-                "anomaly_score": transaction[5],
+                "fraud_risk_score": transaction[5],
 
-                "fraud_risk_score": transaction[6],
-
-                "fraud_risk_level": transaction[7],
+                "fraud_risk_level": transaction[6],
 
                 "alert": bool(
-                    transaction[8]
+                    transaction[7]
                 ),
 
-                "message": transaction[9],
+                "message": transaction[8],
 
-                "recommended_action":
-                    transaction[10]
+                "user_id": transaction[9],
+
+                "recommended_action": transaction[10]
+
             })
-
 
         return jsonify({
 
@@ -456,43 +552,34 @@ def fraud_history():
 
         }), 200
 
-
     except Exception as e:
 
         return jsonify({
-
             "status": "error",
-
             "error": str(e)
-
         }), 500
 
 
-# ============================================================
-# FEEDBACK LOOP
-# ============================================================
+# ---------------------------------------------------------
+# Save Fraud Feedback
+# ---------------------------------------------------------
 
 @app.route(
     "/api/fraud/feedback",
     methods=["POST"]
 )
-def submit_feedback():
+def fraud_feedback():
 
     try:
 
         data = request.get_json()
 
-
         if not data:
 
             return jsonify({
-
                 "status": "error",
-
                 "error": "No feedback data provided"
-
             }), 400
-
 
         transaction_id = data.get(
             "transaction_id"
@@ -502,128 +589,80 @@ def submit_feedback():
             "feedback"
         )
 
-
-        # ------------------------------------------------------
-        # Validate transaction ID
-        # ------------------------------------------------------
-
         if transaction_id is None:
 
             return jsonify({
-
                 "status": "error",
-
-                "error":
-                    "transaction_id is required"
-
+                "error": "transaction_id is required"
             }), 400
 
-
-        try:
-
-            transaction_id = int(
-                transaction_id
-            )
-
-        except (TypeError, ValueError):
-
-            return jsonify({
-
-                "status": "error",
-
-                "error":
-                    "transaction_id must be an integer"
-
-            }), 400
-
-
-        # ------------------------------------------------------
-        # Validate feedback
-        # ------------------------------------------------------
-
-        allowed_feedback = [
+        if feedback not in [
             "confirmed_fraud",
             "false_positive"
-        ]
-
-        if feedback not in allowed_feedback:
+        ]:
 
             return jsonify({
-
                 "status": "error",
-
-                "error":
-                    "feedback must be "
+                "error": (
+                    "Feedback must be "
                     "'confirmed_fraud' or "
                     "'false_positive'"
-
+                )
             }), 400
 
-
-        # ------------------------------------------------------
-        # Save feedback
-        # ------------------------------------------------------
-
         save_feedback(
-            transaction_id,
-            feedback
+            transaction_id=int(
+                transaction_id
+            ),
+            feedback=feedback
         )
-
 
         return jsonify({
 
             "status": "success",
 
-            "message":
-                "Fraud feedback saved successfully.",
+            "message": (
+                "Fraud feedback saved successfully."
+            ),
 
-            "transaction_id":
-                transaction_id,
+            "transaction_id": int(
+                transaction_id
+            ),
 
-            "feedback":
-                feedback
+            "feedback": feedback
 
         }), 200
-
 
     except ValueError as e:
 
         return jsonify({
-
             "status": "error",
-
             "error": str(e)
-
         }), 400
-
 
     except Exception as e:
 
         return jsonify({
-
             "status": "error",
-
             "error": str(e)
-
         }), 500
 
 
-# ============================================================
-# FEEDBACK HISTORY
-# ============================================================
+# ---------------------------------------------------------
+# Get Fraud Feedback
+# ---------------------------------------------------------
 
 @app.route(
     "/api/fraud/feedback",
     methods=["GET"]
 )
-def feedback_history():
+def fraud_feedback_history():
 
     try:
 
         feedback_rows = get_feedback()
 
         results = []
-
 
         for row in feedback_rows:
 
@@ -639,7 +678,6 @@ def feedback_history():
 
             })
 
-
         return jsonify({
 
             "status": "success",
@@ -650,35 +688,25 @@ def feedback_history():
 
         }), 200
 
-
     except Exception as e:
 
         return jsonify({
-
             "status": "error",
-
             "error": str(e)
-
         }), 500
 
 
-# ============================================================
-# START FLASK SERVER
-# ============================================================
+# ---------------------------------------------------------
+# Start Flask server
+# ---------------------------------------------------------
 
 if __name__ == "__main__":
 
     print("========================================")
-
-    print(
-        "RAGHAVI FRAUD DETECTION API"
-    )
-
+    print("RAGHAVI FRAUD DETECTION API")
     print("========================================")
 
-    print(
-        "\nStarting Flask server..."
-    )
+    print("\nStarting Flask server...")
 
     app.run(
         debug=True,
