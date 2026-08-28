@@ -1,24 +1,54 @@
-import pandas as pd
-
-from preprocessing import load_and_preprocess_data
 from fraud_detection import predict_transaction
 
 
-# Load the original dataset
-df = pd.read_csv("data/creditcard.csv")
+print("========================================")
+print("RAGHAVI FRAUD DETECTION - LIVE TEST")
+print("========================================")
 
-# Take one transaction
-transaction = df.drop("Class", axis=1).head(1)
 
-# Predict the transaction
+# Create a NEW transaction
+transaction = {
+    "Time": 10000,
+
+    "V1": 0,
+    "V2": 0,
+    "V3": 0,
+    "V4": 0,
+    "V5": 0,
+    "V6": 0,
+    "V7": 0,
+    "V8": 0,
+    "V9": 0,
+    "V10": 0,
+    "V11": 0,
+    "V12": 0,
+    "V13": 0,
+    "V14": 0,
+    "V15": 0,
+    "V16": 0,
+    "V17": 0,
+    "V18": 0,
+    "V19": 0,
+    "V20": 0,
+    "V21": 0,
+    "V22": 0,
+    "V23": 0,
+    "V24": 0,
+    "V25": 0,
+    "V26": 0,
+    "V27": 0,
+    "V28": 0,
+
+    "Amount": 100
+}
+
+
+# Predict the new transaction
 result = predict_transaction(transaction)
 
-print("========================================")
-print("RAGHAVI FRAUD DETECTION TEST")
+
+print("\n========================================")
+print("FRAUD DETECTION RESULT")
 print("========================================")
 
-print("\nInput transaction:")
-print(transaction.to_string(index=False))
-
-print("\nPrediction result:")
 print(result.to_string(index=False))
