@@ -1,0 +1,18 @@
+{
+  "asset": "gold",
+  "frequency": "daily",
+  "ai_strategy": {
+    "total_return": 0.39,
+    "cagr": 0.64,
+    "sharpe_ratio": 0.13,
+    "max_drawdown": -17.36
+  },
+  "buy_and_hold": {
+    "total_return": 1.51,
+    "cagr": 2.44,
+    "sharpe_ratio": 0.24,
+    "max_drawdown": -25.06
+  },
+  "win_rate": 17.95,
+  "number_of_trades": 2
+}

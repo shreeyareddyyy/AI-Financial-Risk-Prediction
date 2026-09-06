@@ -1,0 +1,18 @@
+{
+  "asset": "bitcoin",
+  "frequency": "daily",
+  "ai_strategy": {
+    "total_return": 20.2,
+    "cagr": 18.73,
+    "sharpe_ratio": 1.06,
+    "max_drawdown": -9.27
+  },
+  "buy_and_hold": {
+    "total_return": -14.84,
+    "cagr": -13.93,
+    "sharpe_ratio": -0.2,
+    "max_drawdown": -39.59
+  },
+  "win_rate": 11.11,
+  "number_of_trades": 5
+}
