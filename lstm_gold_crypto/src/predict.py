@@ -8,6 +8,25 @@ import numpy as np
 import pandas as pd
 import torch
 import yfinance as yf
+
+def usd_to_inr():
+    try:
+        rate = yf.download(
+            "INR=X",
+            period="1d",
+            interval="1d",
+            progress=False,
+            auto_adjust=False
+        )
+
+        if isinstance(rate.columns, pd.MultiIndex):
+            rate.columns = rate.columns.get_level_values(0)
+
+        return float(rate["Close"].iloc[-1])
+
+    except:
+        return 83.0
+    
 import shap
 
 from model import PriceVolatilityLSTM
@@ -387,6 +406,11 @@ def main(asset, frequency="daily"):
         current_price * np.exp(predicted_log_return)
     )
 
+    inr_rate = usd_to_inr()
+
+    current_price_inr = current_price * inr_rate
+    predicted_price_inr = predicted_next_interval_price * inr_rate
+
     confidence_interval = calculate_confidence_interval(
         predicted_next_interval_price,
         predicted_future_volatility
@@ -449,8 +473,10 @@ def main(asset, frequency="daily"):
         "ticker": TICKERS[asset],
         "data_source": data_source,
         "last_updated": last_updated,
-        "current_price": round(current_price, 2),
-        "predicted_next_interval_price": round(predicted_next_interval_price, 2),
+        "currency": "INR",
+        "exchange_rate_usd_inr": round(inr_rate, 2),
+        "current_price": round(current_price_inr, 2),
+        "predicted_next_interval_price": round(predicted_price_inr, 2),
         "prediction_horizon": prediction_horizon,
         "confidence_interval": confidence_interval,
         "forecast": forecast,
