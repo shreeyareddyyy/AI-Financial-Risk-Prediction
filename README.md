@@ -106,3 +106,32 @@ This project is developed for academic purposes as part of the Major Project for
 ## Acknowledgements
 
 We sincerely thank our project guide **Dr. Shalma**, the Department of Artificial Intelligence and Machine Learning, CMR Institute of Technology, and all faculty members for their valuable guidance and support throughout the project. 
+
+---
+
+## Raghavi's Contribution: Fraud Detection Module
+
+- Implemented fraud detection using the Isolation Forest algorithm.
+- Developed transaction prediction and fraud risk scoring.
+- Categorized transactions into Low, Medium, and High risk levels.
+- Integrated fraud prediction with a Flask API.
+- Implemented transaction history storage using SQLite.
+- Added feedback support for confirmed fraud and false positives.
+- Tested model integration and transaction prediction.
+- Performed threshold analysis to evaluate precision, recall, and F1-score.
+
+### Model Evaluation
+
+| Metric | Value |
+|---|---:|
+| Accuracy | 99.47% |
+| Precision | 13.60% |
+| Recall | 40.80% |
+| F1 Score | 20.40% |
+
+### Model Configuration
+
+- Algorithm: Isolation Forest
+- Number of estimators: 300
+- Contamination: 0.005
+
